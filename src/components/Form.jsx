@@ -1,16 +1,11 @@
 import React, { useState } from 'react'
 import GeneratedLetter from './GeneratedLetter'
 
-function simulateGenerateLetter({ name, role, company, skills }){
-  // simulated latency
-  const template = `Dear Hiring Manager at ${company},\n\nMy name is ${name} and I am excited to apply for the ${role} position at ${company}. With skills including ${skills}, I am confident I can contribute meaningfully to your team. I look forward to the possibility of discussing how my background aligns with your needs.\n\nSincerely,\n${name}`
-  return template
-}
-
 export default function CoverForm(){
   const [form, setForm] = useState({ name: '', role: '', company: '', skills: '' })
   const [loading, setLoading] = useState(false)
   const [letter, setLetter] = useState('')
+  const [error, setError] = useState(null)
 
   function onChange(e){
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -20,11 +15,26 @@ export default function CoverForm(){
     e.preventDefault()
     setLoading(true)
     setLetter('')
-    // simulate latency (like an LLM call)
-    await new Promise(r => setTimeout(r, 1200))
-    const output = simulateGenerateLetter(form)
-    setLetter(output)
-    setLoading(false)
+    setError(null)
+
+    try{
+      const resp = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      })
+
+      const data = await resp.json()
+      if(!resp.ok){
+        setError(data.error || 'Generation failed')
+      } else {
+        setLetter(data.text || '')
+      }
+    }catch(err){
+      setError(err.message)
+    }finally{
+      setLoading(false)
+    }
   }
 
   return (
@@ -57,6 +67,7 @@ export default function CoverForm(){
 
       <div className="output">
         {loading ? <p className="loading">Generating...</p> : null}
+        {error ? <p style={{ color: 'red' }}>{error}</p> : null}
         <GeneratedLetter text={letter} />
       </div>
     </div>
